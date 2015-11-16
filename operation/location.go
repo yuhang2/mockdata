@@ -19,17 +19,10 @@ var (
 	err error
 )
 
-func init() {
+func Location(line int) {
 	db, err = sql.Open("postgres", config.Config.RedShift.String())
 	if err != nil {
 		fmt.Printf("Err: %v", err)
-	}
-}
-
-func Location(line int) {
-	if db == nil {
-		fmt.Println("db is nil")
-		return
 	}
 	defer db.Close()
 
