@@ -1,0 +1,12 @@
+{
+  "redshift": {
+    "host": "localhost",
+    "port": 5439,
+    "user": "mock",
+    "password": "mock",
+    "db": "mockdb",
+    "ssl": "disable",
+    "maxConn": 10,
+    "workerCount": 10
+  }
+}
