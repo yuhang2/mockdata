@@ -51,8 +51,8 @@ func Location(line int) {
 	writer := csv.NewWriter(csvFile)
 	for line > 0 {
 		go func(start, limit int) {
-			listQuery := "select pick_up_latitude, pick_up_longitude, drop_off_latitude, drop_off_longitude, create_at_local" +
-				" from grab_road_bookings order by created_at_local desc limit $1, $2"
+			listQuery := "select pick_up_latitude, pick_up_longitude, drop_off_latitude, drop_off_longitude, created_at_local" +
+				" from grab_road_bookings limit $2 offset $1"
 			rows, err := db.Query(listQuery, start, limit)
 			if err != nil {
 				fmt.Printf(err.Error())
