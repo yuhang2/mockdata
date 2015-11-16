@@ -1,59 +1,109 @@
 package operation
 
 import (
+	"database/sql"
+	"encoding/csv"
 	"fmt"
+	"log"
+	"math"
+	"os"
+	"strconv"
+	"time"
 
+	_ "github.com/lib/pq"
 	"github.com/yuhang2/mockdata/config"
 )
 
-func Location(line int) {
-	fmt.Println("Get Location", line)
-	fmt.Println(config.Config)
+var (
+	db  *sql.DB
+	err error
+)
+
+func init() {
+	db, err = sql.Open("postgres", config.Config.RedShift.String())
+	if err != nil {
+		fmt.Printf("Err: %v", err)
+	}
 }
 
-/*
-var BookingList = func(start time.Time, stop time.Time, fileName *string) error {
-	db, err := sql.Open("postgres", string(config.Config))
+func Location(line int) {
+	if db == nil {
+		fmt.Println("db is nil")
+		return
+	}
 	defer db.Close()
-	if err != nil {
-		return err
+
+	start := 0
+	limit := 1000
+	channelNum := int(math.Ceil(float64(line) / float64(limit)))
+	execChannel := make(chan string, channelNum)
+
+	type booking struct {
+		pickUpLatitude   float64
+		pickUpLongitude  float64
+		dropOffLatitude  float64
+		dropOffLongitude float64
+		createTime       time.Time
 	}
-	listQuery := "select booking_code, created_at_local from grab_road_bookings where created_at_local >= $1 and created_at_local <= $2 and picking_up_time is not NULL and dropping_off_time is not NULL"
-	rows, err := db.Query(listQuery, start, stop)
+	var pickUpLatitude, pickUpLongitude, dropOffLatitude, dropOffLongitude float64
+	var createTime time.Time
+	bookingsChan := make(chan booking, 1)
+
+	csvFile, err := os.Create("bookings.csv")
 	if err != nil {
-		return err
+		log.Println("create bookings.csv failed")
+		return
 	}
-	defer rows.Close()
-	var bookings [][]string
-	var booking_code string
-	var create_at_local time.Time
-	for rows.Next() {
-		err = rows.Scan(&booking_code, &create_at_local)
+	defer csvFile.Close()
+	writer := csv.NewWriter(csvFile)
+	for line > 0 {
+		go func(start, limit int) {
+			listQuery := "select pick_up_latitude, pick_up_longitude, drop_off_latitude, drop_off_longitude, create_at_local" +
+				" from grab_road_bookings order by created_at_local desc limit $1, $2"
+			rows, err := db.Query(listQuery, start, limit)
+			if err != nil {
+				fmt.Printf(err.Error())
+				return
+			}
+			defer rows.Close()
+
+			for rows.Next() {
+				err := rows.Scan(&pickUpLatitude, &pickUpLongitude, &dropOffLatitude, &dropOffLongitude, &createTime)
+				if err != nil {
+					log.Printf("scan grab_road_bookings error: %v\n", err)
+					continue
+				}
+				bookingsChan <- booking{
+					pickUpLatitude:   pickUpLatitude,
+					pickUpLongitude:  pickUpLongitude,
+					dropOffLatitude:  dropOffLatitude,
+					dropOffLongitude: dropOffLongitude,
+					createTime:       createTime,
+				}
+			}
+
+			execChannel <- "ok"
+		}(start, limit)
+		start += limit
+		line -= limit
+	}
+
+	for i := 0; i < channelNum; i++ {
+		<-execChannel
+	}
+	records := []string{}
+	for info := range bookingsChan {
+		records = []string{
+			strconv.FormatFloat(info.dropOffLatitude, 'f', 8, 64),
+			strconv.FormatFloat(info.dropOffLatitude, 'f', 8, 64),
+			strconv.FormatFloat(info.dropOffLatitude, 'f', 8, 64),
+			strconv.FormatFloat(info.dropOffLatitude, 'f', 8, 64),
+			info.createTime.Format("2006-01-02T15:04:05"),
+		}
+		err := writer.Write(records)
 		if err != nil {
-			log.Printf("scan grab_road_bookings error: %v", err)
-			continue
-		}
-		bookings = append(bookings, []string{
-			booking_code,
-			create_at_local.Format("2006-01-02T15:04:05"),
-		})
-	}
-	fileOut, err := os.Create(*fileName)
-	defer fileOut.Close()
-	if err != nil {
-		log.Printf("create file %s error: %v", *fileName, err)
-		return nil
-	}
-	w := csv.NewWriter(fileOut)
-	for _, record := range bookings {
-		if err := w.Write(record); err != nil {
-			log.Printf("error writing record to csv, err: %v", err)
+			fmt.Printf("save bookings info error, info: %v\n", info)
 		}
 	}
-	w.Flush()
-	if err := w.Error(); err != nil {
-		log.Printf("error: ", err)
-	}
-	return nil
+	writer.Flush()
 }
-*/
