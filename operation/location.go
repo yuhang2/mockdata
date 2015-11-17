@@ -87,6 +87,7 @@ func Location(line int) {
 	for i := 0; i < channelNum; i++ {
 		<-execChannel
 	}
+	close(bookingsChan)
 	records := []string{}
 	for info := range bookingsChan {
 		records = []string{
