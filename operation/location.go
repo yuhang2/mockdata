@@ -40,7 +40,7 @@ func Location(line int) {
 	}
 	var pickUpLatitude, pickUpLongitude, dropOffLatitude, dropOffLongitude float64
 	var createTime time.Time
-	bookingsChan := make(chan booking, 1)
+	bookingsChan := make(chan booking, 1000)
 
 	csvFile, err := os.Create("bookings.csv")
 	if err != nil {
